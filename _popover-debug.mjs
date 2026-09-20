@@ -1,0 +1,17 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+const page = await context.newPage();
+page.on("console", (m) => console.log("[console]", m.text()));
+page.on("pageerror", (e) => console.log("[pageerror]", e.message));
+await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
+await page.waitForTimeout(1000);
+const pt = page.locator(".map-point").first();
+console.log("count:", await pt.count());
+const box = await pt.boundingBox();
+console.log("box:", box);
+await pt.click({ force: true });
+await page.waitForTimeout(800);
+console.log("popover count:", await page.locator(".model-popover").count());
+await page.screenshot({ path: "/tmp/pop-debug.png" });
+await browser.close();

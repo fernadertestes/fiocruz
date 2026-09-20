@@ -80,7 +80,7 @@ export function ModelPreview({ url, label, margin = 0.72 }: { url: string; label
       <directionalLight position={[4, 7, 5]} intensity={2.4} />
       <directionalLight position={[-4, 2, -3]} intensity={0.85} color="#d78142" />
       <Suspense fallback={null}>
-        <RotatingModel url={url} reduceMotion={reduceMotion} margin={margin} />
+        <RotatingModel key={url} url={url} reduceMotion={reduceMotion} margin={margin} />
       </Suspense>
     </Canvas>
   );

@@ -235,7 +235,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .map-frame { height: 440px; margin-top: 14px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; scrollbar-width: thin; }
   .map-canvas { width: 820px; height: 420px; inset: 0 auto auto 0; transform-origin: 42% center; }
   .campus-map { object-position: left center; }
-  .map-instruction { left: 205px; top: 12px; transform: none; }
+  .map-instruction { left: 34px; top: 12px; transform: none; max-width: 260px; white-space: normal; }
   .map-instruction__desktop { display: none; }
   .map-instruction__mobile { display: inline; }
   .map-point { --point-size: 34px; }
@@ -251,7 +251,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .map-cursor { display: none; }
   .map-chrome { inset: 10px; width: 800px; }
   .map-chrome__north { display: none; }
-  .map-chrome__coordinate { right: auto; left: 590px; }
+  .map-chrome__coordinate { display: none; }
   .map-frame::after { width: 700px; left: 40px; }
   .map-badge { position: sticky; left: 20px; bottom: 18px; width: max-content; margin-top: 350px; }
   .map-controls, .map-scale, .map-pulse { display: none; }

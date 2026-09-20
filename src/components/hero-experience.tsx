@@ -223,7 +223,7 @@ export function HeroExperience() {
                   {activeSite.institution && <em>{activeSite.institution}</em>}
               </div>
               <div className="model-popover__canvas">
-                  <ModelPreview key={activeSite.model} url={activeSite.model} label={activeSite.name} margin={activeSite.previewMargin} />
+                  <ModelPreview url={activeSite.model} label={activeSite.name} margin={activeSite.previewMargin} />
                 <span className="model-popover__orbit" aria-hidden="true" />
               </div>
               <p>Modelo ilustrativo · rotação automática</p>
