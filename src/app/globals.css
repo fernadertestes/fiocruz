@@ -122,6 +122,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .model-popover--top.model-popover--right { transform: translate(30px, -18%); transform-origin: left top; }
 @keyframes popover-in { from { opacity: 0; scale: .92; } to { opacity: 1; scale: 1; } }
 .model-popover__close { display: none; }
+.model-popover--anchored { position: fixed; z-index: 120; left: 0; top: 0; right: auto; bottom: auto; display: flex; flex-direction: column; overflow: hidden; margin: 0; animation: none; transform: none !important; pointer-events: auto; contain: layout; }
+.model-popover__dismiss { position: absolute; inset: 0; z-index: 6; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.model-popover--anchored .model-popover__close { position: absolute; z-index: 8; right: 8px; top: 8px; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 0; background: var(--fio-wine); color: #fff; }
+.model-popover--anchored .model-popover__heading { flex: 0 0 auto; height: auto; min-height: 72px; padding-right: 48px; }
+.model-popover--anchored.has-institution .model-popover__heading { height: auto; min-height: 88px; }
+.model-popover--anchored .model-popover__canvas,
+.model-popover--anchored.has-institution .model-popover__canvas { flex: 1 1 auto; height: auto !important; min-height: 0; }
+.model-popover--anchored > p { flex: 0 0 28px; }
 .model-popover__heading { position: relative; z-index: 2; height: 94px; display: grid; grid-template-columns: 1fr auto; align-content: center; gap: 2px 12px; padding: 16px 18px 14px; background: rgba(248,243,233,.94); border-bottom: 1px solid #ded6c7; }
 .model-popover__heading > span { color: var(--fio-orange); text-transform: uppercase; letter-spacing: .14em; font-size: .61rem; font-weight: 900; }
 .model-popover__heading small { justify-self: end; color: #71807c; font-size: .66rem; }
@@ -232,16 +240,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .campus-intro__side p { margin-bottom: 14px; }
   .campus-signals { margin-top: 24px; grid-template-columns: 1fr 1fr; }
   .campus-signals > span { min-height: 54px; }
-  .map-frame { height: 440px; margin-top: 14px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; scrollbar-width: thin; }
+  .map-frame { height: 440px; margin-top: 14px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-inline: contain; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
   .map-canvas { width: 820px; height: 420px; inset: 0 auto auto 0; transform-origin: 42% center; }
   .campus-map { object-position: left center; }
   .map-instruction { left: 34px; top: 12px; transform: none; max-width: 260px; white-space: normal; }
   .map-instruction__desktop { display: none; }
   .map-instruction__mobile { display: inline; }
-  .map-point { --point-size: 34px; }
-  .model-popover,
-  .model-popover--top.model-popover--left,
-  .model-popover--top.model-popover--right { position: fixed; z-index: 100; left: 20px; right: 20px; top: auto; bottom: 20px; width: auto; height: 306px; margin: 0; transform: none; pointer-events: auto; }
+  .campus-hero { overflow: visible; }
+  .map-point { --point-size: 44px; touch-action: manipulation; }
+  .model-popover:not(.model-popover--anchored),
+  .model-popover--top.model-popover--left:not(.model-popover--anchored),
+  .model-popover--top.model-popover--right:not(.model-popover--anchored) { position: fixed; z-index: 100; left: 20px; right: 20px; top: auto; bottom: 20px; width: auto; height: 306px; margin: 0; transform: none; pointer-events: auto; }
   .model-popover__close { position: absolute; z-index: 8; right: 10px; top: 10px; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 0; background: var(--fio-wine); color: #fff; cursor: pointer; }
   .model-popover__heading { padding-right: 58px; }
   .model-popover__heading { height: 84px; }

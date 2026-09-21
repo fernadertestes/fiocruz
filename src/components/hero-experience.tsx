@@ -2,8 +2,48 @@
 
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import campusMap from "../../public/images/mapa-fiocruz-rio.png";
+
+function usesHoverPreview() {
+  return window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 741px)").matches;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+type PopoverBox = { left: number; top: number; width: number; height: number };
+
+function placePopoverBesidePin(pin: DOMRect, preferLeft: boolean): PopoverBox {
+  const margin = 10;
+  const gap = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const width = Math.min(248, Math.max(200, vw - 80));
+  const height = 276;
+  const spaceLeft = pin.left - gap - margin;
+  const spaceRight = vw - pin.right - gap - margin;
+  const openLeft = preferLeft
+    ? spaceLeft >= width * 0.5 || spaceLeft >= spaceRight
+    : spaceRight >= width * 0.5 || spaceRight >= spaceLeft;
+  let left = openLeft ? pin.left - gap - width : pin.right + gap;
+  left = clamp(left, margin, vw - width - margin);
+  let top = pin.top + pin.height / 2 - height / 2;
+  if (pin.top < 96) top = pin.bottom + gap;
+  if (pin.bottom > vh - 88) top = pin.top - gap - height;
+  top = clamp(top, margin, vh - height - margin);
+  const overlapsPin = left < pin.right && left + width > pin.left && top < pin.bottom && top + height > pin.top;
+  if (overlapsPin) {
+    if (pin.right + gap + width <= vw - margin) left = pin.right + gap;
+    else if (pin.left - gap - width >= margin) left = pin.left - gap - width;
+    else top = pin.bottom + gap;
+    left = clamp(left, margin, vw - width - margin);
+    top = clamp(top, margin, vh - height - margin);
+  }
+  return { left: Math.round(left), top: Math.round(top), width, height };
+}
 
 const ModelPreview = dynamic(() => import("./model-preview").then((module) => module.ModelPreview), {
   ssr: false,
@@ -49,6 +89,26 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
 
+function ModelPopoverBody({ site, onClose, dismissOnTap = false }: { site: CampusSite; onClose: () => void; dismissOnTap?: boolean }) {
+  return (
+    <>
+      <button className="model-popover__close" type="button" aria-label="Fechar prévia 3D" onClick={onClose}><Icon name="close" /></button>
+      {dismissOnTap && <button className="model-popover__dismiss" type="button" aria-label="Fechar prévia 3D" onClick={onClose} />}
+      <div className="model-popover__heading">
+        <span>Prévia 3D</span>
+        <small>{site.category}</small>
+        <strong>{site.displayName ?? site.name}</strong>
+        {site.institution && <em>{site.institution}</em>}
+      </div>
+      <div className="model-popover__canvas">
+        <ModelPreview key={site.model} url={site.model} label={site.name} margin={site.previewMargin} />
+        <span className="model-popover__orbit" aria-hidden="true" />
+      </div>
+      <p>Modelo ilustrativo · rotação automática</p>
+    </>
+  );
+}
+
 function BrazilMark() {
   return (
     <span className="brazil-mark" aria-hidden="true">
@@ -84,27 +144,105 @@ export function HeroExperience() {
   const [cursorOverPoint, setCursorOverPoint] = useState(false);
   const cursorRef = useRef<HTMLDivElement>(null);
   const mapFrameRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLElement>(null);
+  const [narrowScreen, setNarrowScreen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 740px)");
+    const update = () => setNarrowScreen(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setMenuOpen(false);
         setSearchOpen(false);
+        setActiveSite(null);
       }
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, []);
 
+  function revealSiteOnMap(site: CampusSite) {
+    const frame = mapFrameRef.current;
+    if (!frame) return;
+    frame.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const canvas = frame.querySelector<HTMLElement>(".map-canvas");
+    if (!canvas || frame.scrollWidth <= frame.clientWidth) return;
+    const pinCenter = (site.x / 100) * canvas.offsetWidth;
+    const align = site.previewSide === "left" ? 0.78 : 0.22;
+    frame.scrollTo({ left: Math.max(0, pinCenter - frame.clientWidth * align), behavior: "auto" });
+  }
+
+  function toggleSite(site: CampusSite, fromHover = false) {
+    if (fromHover) {
+      setActiveSite(site);
+      return;
+    }
+    if (activeSite?.id === site.id) {
+      setActiveSite(null);
+      return;
+    }
+    setActiveSite(site);
+    revealSiteOnMap(site);
+  }
+
+  useEffect(() => {
+    if (!activeSite || usesHoverPreview()) return;
+    const ignoreUntil = Date.now() + 350;
+    function closeOnOutside(event: PointerEvent) {
+      if (Date.now() < ignoreUntil) return;
+      const target = event.target as Element | null;
+      if (target?.closest("[data-site-id], .campus-route__list button")) return;
+      setActiveSite(null);
+    }
+    document.addEventListener("pointerdown", closeOnOutside);
+    return () => document.removeEventListener("pointerdown", closeOnOutside);
+  }, [activeSite]);
+
+  useLayoutEffect(() => {
+    if (!activeSite || !narrowScreen) return;
+    const place = () => {
+      const node = popoverRef.current;
+      const pin = mapFrameRef.current?.querySelector(`[data-site-id="${activeSite.id}"]`);
+      if (!node || !pin) return;
+      const box = placePopoverBesidePin(pin.getBoundingClientRect(), activeSite.previewSide === "left");
+      const left = `${box.left}px`;
+      const top = `${box.top}px`;
+      if (node.style.left !== left) node.style.left = left;
+      if (node.style.top !== top) node.style.top = top;
+    };
+    place();
+    let frameId = 0;
+    const schedule = () => {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        place();
+      });
+    };
+    const frame = mapFrameRef.current;
+    frame?.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    const timer = window.setTimeout(place, 80);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timer);
+      frame?.removeEventListener("scroll", schedule);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [activeSite, narrowScreen]);
+
   function moveMapCursor(event: React.PointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     cursorRef.current?.style.setProperty("--cursor-x", `${event.clientX - bounds.left}px`);
     cursorRef.current?.style.setProperty("--cursor-y", `${event.clientY - bounds.top}px`);
-  }
-
-  function openSiteFromRoute(site: CampusSite) {
-    setActiveSite(site);
-    mapFrameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   return (
@@ -172,7 +310,11 @@ export function HeroExperience() {
           aria-label="Mapa aéreo ilustrativo do campus da Fiocruz em Manguinhos. Passe o cursor ou use a tecla Tab nos pontos para visualizar os modelos 3D. Em telas pequenas, deslize horizontalmente para explorar."
           onPointerMove={moveMapCursor}
           onPointerEnter={() => setCursorVisible(true)}
-          onPointerLeave={() => { setCursorVisible(false); setCursorOverPoint(false); setActiveSite(null); }}
+          onPointerLeave={() => {
+            setCursorVisible(false);
+            setCursorOverPoint(false);
+            if (usesHoverPreview()) setActiveSite(null);
+          }}
         >
           <div className="map-chrome" aria-hidden="true">
             <span className="map-chrome__corner map-chrome__corner--tl" />
@@ -194,13 +336,24 @@ export function HeroExperience() {
                 type="button"
                 className={`map-point ${activeSite?.id === site.id ? "is-active" : ""}`}
                 style={{ "--point-x": `${site.x}%`, "--point-y": `${site.y}%` } as React.CSSProperties}
+                data-site-id={site.id}
                 aria-label={`Ver modelo 3D de ${site.name}`}
                 aria-pressed={activeSite?.id === site.id}
-                onPointerEnter={() => { setActiveSite(site); setCursorOverPoint(true); }}
+                onPointerEnter={() => {
+                  setCursorOverPoint(true);
+                  if (usesHoverPreview()) toggleSite(site, true);
+                }}
                 onPointerLeave={() => setCursorOverPoint(false)}
-                onFocus={() => setActiveSite(site)}
-                onBlur={() => setActiveSite(null)}
-                onClick={() => setActiveSite(site)}
+                onFocus={() => {
+                  if (usesHoverPreview()) setActiveSite(site);
+                }}
+                onBlur={() => {
+                  if (usesHoverPreview()) setActiveSite(null);
+                }}
+                onClick={() => {
+                  if (usesHoverPreview()) return;
+                  toggleSite(site);
+                }}
               >
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <i />
@@ -209,24 +362,13 @@ export function HeroExperience() {
 
           </div>
 
-          {activeSite && (
+          {activeSite && narrowScreen === false && (
             <aside
               className={`model-popover model-popover--${activeSite.previewSide} ${activeSite.institution ? "has-institution" : ""} ${activeSite.y < 30 ? "model-popover--top" : ""}`}
               style={{ "--point-x": `${activeSite.x}%`, "--point-y": `${activeSite.y}%` } as React.CSSProperties}
               aria-live="polite"
             >
-              <button className="model-popover__close" type="button" aria-label="Fechar prévia 3D" onClick={() => setActiveSite(null)}><Icon name="close" /></button>
-              <div className="model-popover__heading">
-                <span>Prévia 3D</span>
-                <small>{activeSite.category}</small>
-                  <strong>{activeSite.displayName ?? activeSite.name}</strong>
-                  {activeSite.institution && <em>{activeSite.institution}</em>}
-              </div>
-              <div className="model-popover__canvas">
-                  <ModelPreview url={activeSite.model} label={activeSite.name} margin={activeSite.previewMargin} />
-                <span className="model-popover__orbit" aria-hidden="true" />
-              </div>
-              <p>Modelo ilustrativo · rotação automática</p>
+              <ModelPopoverBody site={activeSite} onClose={() => setActiveSite(null)} />
             </aside>
           )}
 
@@ -263,7 +405,7 @@ export function HeroExperience() {
                 key={site.id}
                 type="button"
                 aria-pressed={activeSite?.id === site.id}
-                onClick={() => openSiteFromRoute(site)}
+                onClick={() => toggleSite(site)}
               >
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <p><strong>{site.displayName ?? site.name}</strong><small>{site.category}</small></p>
@@ -273,6 +415,18 @@ export function HeroExperience() {
           </div>
         </div>
       </section>
+
+      {activeSite && narrowScreen && createPortal(
+        <aside
+          ref={popoverRef}
+          className={`model-popover model-popover--anchored ${activeSite.institution ? "has-institution" : ""}`}
+          style={{ width: 248, height: 276 }}
+          aria-live="polite"
+        >
+          <ModelPopoverBody key={activeSite.id} site={activeSite} onClose={() => setActiveSite(null)} dismissOnTap />
+        </aside>,
+        document.body,
+      )}
     </main>
   );
 }
